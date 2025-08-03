@@ -7,9 +7,8 @@ pub const MemoryBlock = Memory.MemoryBlock;
 
 // cpu sub unit
 pub const Decoder = @import("cpu_subunit/Decoder.zig");
-pub const Operation = Decoder.Operation;
-
 pub const Executor = @import("cpu_subunit/Executor.zig");
+pub const Fetcher = @import("cpu_subunit/Fetcher.zig");
 
 // Reg.zig
 pub const Reg = @import("Reg.zig");

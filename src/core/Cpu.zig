@@ -5,6 +5,7 @@ pc: u32,
 mem: Memory,
 csr: Csr,
 mode: Mode,
+fetcher: Fetcher,
 
 pub fn init(allocator: Allocator) Allocator.Error!Self {
     return .{
@@ -13,6 +14,7 @@ pub fn init(allocator: Allocator) Allocator.Error!Self {
         .mem = try Memory.init(allocator),
         .csr = undefined,
         .mode = undefined,
+        .fetcher = .{ .c_inst_buffer = 0, .c_inst_addr_buffer = null, .this_inst = .{ .inst = 0 } },
     };
 }
 
@@ -34,7 +36,7 @@ pub fn restart(self: *Self) void {
 }
 
 pub fn tick(self: *Self, show_inst: bool) Error!void {
-    const inst = self.mem.readWord(self.pc) catch |e| {
+    const inst = self.fetcher.fetch(self) catch |e| {
         switch (e) {
             Memory.AccessError.AddrNotAligned => Executor.trap(self, .instruction_address_misaligned),
             Memory.AccessError.AddrOutOfRange => Executor.trap(self, .instruction_access_fault),
@@ -43,7 +45,13 @@ pub fn tick(self: *Self, show_inst: bool) Error!void {
         return;
     };
 
-    const operation = Decoder.decode(inst) catch |e| {
+    if (inst == .cinst) {
+        std.debug.print(color.warn(.{"C Extension have not be test completely.\n"}), .{});
+    }
+    const operation = switch (inst) {
+        .inst => |v| Decoder.decode(v),
+        .cinst => |v| Decoder.decodeCompressed(v),
+    } catch |e| {
         switch (e) {
             Decoder.Error.CodeIncorrect => Executor.trap(self, .illegal_instruction),
         }
@@ -54,7 +62,7 @@ pub fn tick(self: *Self, show_inst: bool) Error!void {
         std.debug.print(color.info(.{"{x:0>8}:\t{}\n"}), .{ self.pc, operation });
     }
 
-    return @errorCast(Executor.exec(self, operation));
+    return @errorCast(Executor.exec(self, operation, inst == .cinst));
 }
 
 pub inline fn addMemoryBlock(
@@ -83,6 +91,7 @@ const Allocator = std.mem.Allocator;
 const core = @import("root.zig");
 const Reg = core.Reg;
 const Csr = core.Csr;
+const Fetcher = core.Fetcher;
 const Decoder = core.Decoder;
 const Executor = core.Executor;
 const Memory = core.Memory;

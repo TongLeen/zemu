@@ -259,6 +259,283 @@ pub fn decode(inst: u32) Error!Operation {
     }
 }
 
+pub fn decodeCompressed(cinst: u16) Error!Operation {
+    const op: u2 = @truncate(cinst);
+    const func3: u3 = @truncate(cinst >> 13);
+
+    return switch (op) {
+        0b00 => switch (func3) {
+            // c.lw
+            0b010 => .{ .ld_I = .{
+                .op = .LW,
+                .rd = bits.truncateAndExtendUnsigned(u5, 3, cinst >> 2) | 0b01000,
+                .rs1 = bits.truncateAndExtendUnsigned(u5, 3, cinst >> 7) | 0b01000,
+                .imm = blk: {
+                    const b6 = bits.extract(.{ 5, 5 }, cinst);
+                    const b5_3 = bits.extract(.{ 12, 10 }, cinst);
+                    const b2 = bits.extract(.{ 6, 6 }, cinst);
+                    break :blk bits.extendUnsigned(
+                        u12,
+                        bits.concat(.{ b6, b5_3, b2 }),
+                    ) << 2;
+                },
+            } },
+            // c.sw
+            0b110 => .{ .st_S = .{
+                .op = .SW,
+                .rs1 = bits.truncateAndExtendUnsigned(u5, 3, cinst >> 7) | 0b01000,
+                .rs2 = bits.truncateAndExtendUnsigned(u5, 3, cinst >> 2) | 0b01000,
+                .imm = blk: {
+                    const b6 = bits.extract(.{ 5, 5 }, cinst);
+                    const b5_3 = bits.extract(.{ 12, 10 }, cinst);
+                    const b2 = bits.extract(.{ 6, 6 }, cinst);
+                    break :blk bits.extendUnsigned(
+                        u12,
+                        bits.concat(.{ b6, b5_3, b2 }),
+                    ) << 2;
+                },
+            } },
+            // c.addi4spn
+            0b000 => .{ .al_I = .{
+                .op = .ADDI,
+                .rd = bits.truncateAndExtendUnsigned(u5, 3, cinst >> 2) | 0b01000,
+                .rs1 = 2,
+                .imm = blk: {
+                    const b5_4 = bits.extract(.{ 12, 11 }, cinst);
+                    const b9_6 = bits.extract(.{ 10, 7 }, cinst);
+                    const b2 = bits.extract(.{ 6, 6 }, cinst);
+                    const b3 = bits.extract(.{ 5, 5 }, cinst);
+                    break :blk bits.extendUnsigned(
+                        u12,
+                        bits.concat(.{ b9_6, b5_4, b3, b2 }),
+                    ) << 2;
+                },
+            } },
+            else => {
+                return Error.CodeIncorrect;
+            },
+        },
+        0b01 => switch (func3) {
+            // c.j c.jal
+            0b101, 0b001 => .{ .jp_J = .{
+                .op = .JAL,
+                .rd = if (func3 == 0b001) 1 else 0,
+                .imm = blk: {
+                    const b11 = bits.extract(.{ 12, 12 }, cinst);
+                    const b4 = bits.extract(.{ 11, 11 }, cinst);
+                    const b9_8 = bits.extract(.{ 10, 9 }, cinst);
+                    const b10 = bits.extract(.{ 8, 8 }, cinst);
+                    const b6 = bits.extract(.{ 7, 7 }, cinst);
+                    const b7 = bits.extract(.{ 6, 6 }, cinst);
+                    const b3_1 = bits.extract(.{ 5, 3 }, cinst);
+                    const b5 = bits.extract(.{ 2, 2 }, cinst);
+                    const v = bits.extendSigned(
+                        u20,
+                        bits.concat(.{ b11, b10, b9_8, b7, b6, b5, b4, b3_1 }),
+                    );
+                    break :blk v;
+                },
+            } },
+            // c.beqz c.bnez
+            0b110, 0b111 => .{ .br_B = .{
+                .op = if (func3 == 0b110) .BEQ else .BNE,
+                .rs1 = bits.truncateAndExtendUnsigned(u5, 3, cinst >> 7) | 0b01000,
+                .rs2 = 0,
+                .imm = blk: {
+                    const b8 = bits.extract(.{ 12, 12 }, cinst);
+                    const b7_6 = bits.extract(.{ 6, 5 }, cinst);
+                    const b5 = bits.extract(.{ 2, 2 }, cinst);
+                    const b4_3 = bits.extract(.{ 11, 10 }, cinst);
+                    const b2_1 = bits.extract(.{ 4, 3 }, cinst);
+                    break :blk bits.extendSigned(
+                        u12,
+                        bits.concat(.{ b8, b7_6, b5, b4_3, b2_1 }),
+                    );
+                },
+            } },
+            // c.li
+            0b010 => .{ .al_I = .{
+                .op = .ADDI,
+                .rd = bits.truncateAndExtendUnsigned(u5, 3, cinst >> 7) | 0b01000,
+                .rs1 = 0,
+                .imm = blk: {
+                    const b5 = bits.extract(.{ 11, 11 }, cinst);
+                    const b4_0: u5 = bits.extract(.{ 6, 2 }, cinst);
+                    break :blk bits.extendSigned(
+                        u12,
+                        bits.concat(.{ b5, b4_0 }),
+                    );
+                },
+            } },
+            // c.lui c.addi16sp
+            0b011 => if (bits.extract(.{ 6, 2 }, cinst) == 2) .{ .al_I = .{
+                .op = .ADDI,
+                .rd = 2,
+                .rs1 = 2,
+                .imm = blk: {
+                    const b9: u1 = bits.extract(.{ 12, 12 }, cinst);
+                    const b8_7: u2 = bits.extract(.{ 4, 3 }, cinst);
+                    const b6: u1 = bits.extract(.{ 5, 5 }, cinst);
+                    const b5: u1 = bits.extract(.{ 2, 2 }, cinst);
+                    const b4: u1 = bits.extract(.{ 6, 6 }, cinst);
+                    break :blk bits.extendSigned(
+                        u12,
+                        bits.concat(.{ b9, b8_7, b6, b5, b4 }),
+                    ) << 4;
+                },
+            } } else .{ .lu_U = .{
+                .op = .LUI,
+                .rd = bits.extract(.{ 11, 7 }, cinst),
+                .imm = blk: {
+                    const b5: u1 = bits.extract(.{ 11, 11 }, cinst);
+                    const b4_0: u5 = bits.extract(.{ 6, 2 }, cinst);
+
+                    const uv = bits.concat(.{ b5, b4_0 });
+                    if (uv == 0) {
+                        return Error.CodeIncorrect;
+                    }
+                    break :blk bits.extendSigned(u20, uv);
+                },
+            } },
+            // c.addi
+            0b000 => .{ .al_I = .{
+                .op = .ADDI,
+                .rd = bits.extract(.{ 11, 7 }, cinst),
+                .rs1 = bits.extract(.{ 11, 7 }, cinst),
+                .imm = blk: {
+                    const b5: u1 = bits.extract(.{ 12, 12 }, cinst);
+                    const b4_0: u5 = bits.extract(.{ 6, 2 }, cinst);
+                    break :blk bits.extendSigned(
+                        u12,
+                        bits.concat(.{ b5, b4_0 }),
+                    );
+                },
+            } },
+
+            // c.srli c.srai c.and c.or c.xor c.sub
+            0b100 => out: {
+                const func2: u2 = bits.extract(.{ 11, 10 }, cinst);
+                const func2_: u2 = bits.extract(.{ 6, 5 }, cinst);
+
+                break :out if (func2 != 0b11) .{ .al_I = .{
+                    .op = switch (func2) {
+                        0b00 => .SRLI,
+                        0b01 => .SRAI,
+                        0b10 => .ANDI,
+                        else => {
+                            return Error.CodeIncorrect;
+                        },
+                    },
+                    .rd = bits.truncateAndExtendUnsigned(u5, 3, cinst >> 7) | 0b01000,
+                    .rs1 = bits.truncateAndExtendUnsigned(u5, 3, cinst >> 7) | 0b01000,
+                    .imm = blk: {
+                        const b5 = bits.extract(.{ 12, 12 }, cinst);
+                        if (func2 != 0b10 and b5 == 1) {
+                            return Error.CodeIncorrect;
+                        }
+                        const b4_0 = bits.extract(.{ 6, 2 }, cinst);
+                        break :blk bits.extendSigned(
+                            u12,
+                            bits.concat(.{ b5, b4_0 }),
+                        );
+                    },
+                } } else blk: {
+                    if (bits.extract(.{ 12, 12 }, cinst) != 0) {
+                        return Error.CodeIncorrect;
+                    }
+                    break :blk .{ .al_R = .{
+                        .op = switch (func2_) {
+                            0b00 => .SUB,
+                            0b01 => .XOR,
+                            0b10 => .OR,
+                            0b11 => .AND,
+                        },
+                        .rd = bits.truncateAndExtendUnsigned(u5, 3, cinst >> 7) | 0b01000,
+                        .rs1 = bits.truncateAndExtendUnsigned(u5, 3, cinst >> 7) | 0b01000,
+                        .rs2 = bits.truncateAndExtendUnsigned(u5, 3, cinst >> 2) | 0b01000,
+                    } };
+                };
+            },
+        },
+        0b10 => switch (func3) {
+            // c.lwsp
+            0b010 => .{ .ld_I = .{
+                .op = .LW,
+                .rd = bits.extract(.{ 11, 7 }, cinst),
+                .rs1 = 2,
+                .imm = blk: {
+                    const b7_6: u2 = bits.extract(.{ 3, 2 }, cinst);
+                    const b4_2: u3 = bits.extract(.{ 6, 4 }, cinst);
+                    const b5: u1 = bits.extract(.{ 12, 12 }, cinst);
+                    break :blk bits.extendUnsigned(u12, bits.concat(.{ b7_6, b5, b4_2 })) << 2;
+                },
+            } },
+            // c.swsp
+            0b110 => .{ .st_S = .{
+                .op = .SW,
+                .rs1 = 2,
+                .rs2 = bits.extract(.{ 6, 2 }, cinst),
+                .imm = blk: {
+                    const b7_6: u2 = bits.extract(.{ 8, 7 }, cinst);
+                    const b5_2: u2 = bits.extract(.{ 10, 9 }, cinst);
+                    break :blk bits.extendUnsigned(u12, bits.concat(.{ b7_6, b5_2 })) << 2;
+                },
+            } },
+            // c.jr c.jalr c.mv c.add
+            0b100 => out: {
+                const is_j = bits.extract(.{ 6, 2 }, cinst) == 0;
+                break :out if (is_j) .{ .jp_I = .{
+                    .op = .JALR,
+                    .rs1 = blk: {
+                        const rs1: u5 = bits.extract(.{ 11, 7 }, cinst);
+                        if (rs1 == 0) {
+                            if (bits.extract(.{ 12, 12 }, cinst) == 1) {
+                                return .{ .env_I = .{
+                                    .op = .EBREAK,
+                                    .rd = 0,
+                                    .rs1 = 0,
+                                    .imm = 0,
+                                } };
+                            } else {
+                                return Error.CodeIncorrect;
+                            }
+                        } else {
+                            break :blk rs1;
+                        }
+                    },
+                    .rd = if (bits.extract(.{ 12, 12 }, cinst) == 1) 1 else 0,
+                    .imm = 0,
+                } } else .{ .al_R = .{
+                    .op = .ADD,
+                    .rd = bits.extract(.{ 6, 2 }, cinst),
+                    .rs1 = if (bits.extract(.{ 12, 12 }, cinst) == 1) bits.extract(.{ 11, 7 }, cinst) else 0,
+                    .rs2 = bits.extract(.{ 6, 2 }, cinst),
+                } };
+            },
+            // c.slli
+            0b000 => .{ .al_I = .{
+                .op = .SLLI,
+                .rd = bits.extract(.{ 11, 7 }, cinst),
+                .rs1 = bits.extract(.{ 11, 7 }, cinst),
+                .imm = blk: {
+                    const b5: u1 = bits.extract(.{ 12, 12 }, cinst);
+                    if (b5 == 1) {
+                        return Error.CodeIncorrect;
+                    }
+                    const b4_0 = bits.extract(.{ 6, 2 }, cinst);
+                    break :blk bits.extendUnsigned(u12, bits.concat(.{ b5, b4_0 }));
+                },
+            } },
+            else => {
+                return Error.CodeIncorrect;
+            },
+        },
+        0b11 => {
+            return Error.CodeIncorrect;
+        },
+    };
+}
+
 /// `Operation` is a `tagged union` which contains what cpu need to do.
 /// This created by `decode` from a `u32` instrutrion code.
 pub const Operation = union(enum) {
@@ -402,22 +679,22 @@ pub const Operation = union(enum) {
                 try writer.print("{s}\tx{d},\tx{d},\t{d}", .{ @tagName(op.op), op.rs1, op.rs2, @as(i12, @bitCast(op.imm)) });
             },
             .jp_J => |op| {
-                try writer.print("{s}\tx{d},\t{d}", .{ @tagName(op.op), op.rd, op.imm });
+                try writer.print("{s}\tx{d},\t{d}", .{ @tagName(op.op), op.rd, @as(i20, @bitCast(op.imm)) });
             },
             .jp_I => |op| {
-                try writer.print("{s}\tx{d},\t{d}(x{d})", .{ @tagName(op.op), op.rd, op.imm, op.rs1 });
+                try writer.print("{s}\tx{d},\t{d}(x{d})", .{ @tagName(op.op), op.rd, @as(i12, @bitCast(op.imm)), op.rs1 });
             },
             .lu_U => |op| {
-                try writer.print("{s}\tx{d},\t{x}", .{ @tagName(op.op), op.rd, op.imm });
+                try writer.print("{s}\tx{d},\t0x{x}", .{ @tagName(op.op), op.rd, op.imm });
             },
             .pc_U => |op| {
-                try writer.print("{s}\tx{d},\t{x}", .{ @tagName(op.op), op.rd, op.imm });
+                try writer.print("{s}\tx{d},\t0x{x}", .{ @tagName(op.op), op.rd, op.imm });
             },
             .ld_I => |op| {
-                try writer.print("{s}\tx{d},\t{d}(x{d})", .{ @tagName(op.op), op.rd, op.imm, op.rs1 });
+                try writer.print("{s}\tx{d},\t{d}(x{d})", .{ @tagName(op.op), op.rd, @as(i12, @bitCast(op.imm)), op.rs1 });
             },
             .st_S => |op| {
-                try writer.print("{s}\tx{d},\t{d}(x{d})", .{ @tagName(op.op), op.rs2, op.imm, op.rs1 });
+                try writer.print("{s}\tx{d},\t{d}(x{d})", .{ @tagName(op.op), op.rs2, @as(i12, @bitCast(op.imm)), op.rs1 });
             },
         }
     }
@@ -430,3 +707,5 @@ const Writer = std.io.AnyWriter;
 
 const core = @import("../root.zig");
 const Csr = core.Csr;
+
+const bits = @import("misc").bits;

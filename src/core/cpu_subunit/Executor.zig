@@ -1,4 +1,4 @@
-pub fn exec(cpu: *Cpu, operation: Operation) Error!void {
+pub fn exec(cpu: *Cpu, operation: Operation, is_c_inst: bool) Error!void {
     switch (operation) {
         .al_R => |op| {
             const rs1v = cpu.readReg(op.rs1);
@@ -199,7 +199,7 @@ pub fn exec(cpu: *Cpu, operation: Operation) Error!void {
         },
         .jp_J => |op| {
             assert(op.op == .JAL);
-            cpu.writeReg(op.rd, cpu.pc + 4);
+            cpu.writeReg(op.rd, cpu.pc + @as(u32, if (is_c_inst) 2 else 4));
 
             const imm_extended: i32 = @as(i20, @bitCast(op.imm));
             const bias_by_byte: i32 = imm_extended << 1;
@@ -208,7 +208,7 @@ pub fn exec(cpu: *Cpu, operation: Operation) Error!void {
         },
         .jp_I => |op| {
             assert(op.op == .JALR);
-            cpu.writeReg(op.rd, cpu.pc + 4);
+            cpu.writeReg(op.rd, cpu.pc + @as(u32, if (is_c_inst) 2 else 4));
 
             const rs1v = cpu.readReg(op.rs1);
             const imm_extended: i32 = @as(i12, @bitCast(op.imm));
@@ -291,7 +291,7 @@ pub fn exec(cpu: *Cpu, operation: Operation) Error!void {
             };
         },
     }
-    cpu.pc += 4;
+    cpu.pc += if (is_c_inst) 2 else 4;
 }
 
 pub fn trap(cpu: *Cpu, cause: TrapCause) void {
@@ -311,8 +311,9 @@ pub fn trap(cpu: *Cpu, cause: TrapCause) void {
     cpu.csr.mepc = cpu.pc;
     // update mtval
     cpu.csr.mtval = switch (cause) {
-        .illegal_instruction => cpu.mem.readWord(cpu.pc) catch {
-            unreachable;
+        .illegal_instruction => switch (cpu.fetcher.this_inst) {
+            .inst => |v| v,
+            .cinst => |v| v,
         },
         .breakpoint => cpu.pc,
         else => 0,
@@ -378,7 +379,7 @@ const assert = std.debug.assert;
 
 const core = @import("../root.zig");
 const Cpu = core.Cpu;
-const Operation = core.Operation;
+const Operation = core.Decoder.Operation;
 const Csr = core.Csr;
 const MemAccessError = core.Memory.AccessError;
 
