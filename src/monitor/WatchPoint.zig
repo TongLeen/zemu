@@ -3,7 +3,7 @@ allocator: Allocator,
 
 pub fn init(allocator: Allocator) Self {
     return .{
-        .points = .init(allocator),
+        .points = .empty,
         .allocator = allocator,
     };
 }
@@ -12,7 +12,7 @@ pub fn deinit(self: *Self) void {
     for (self.points.items) |*point| {
         point.expr.deinit();
     }
-    self.points.deinit();
+    self.points.deinit(self.allocator);
 }
 
 pub fn add(self: *Self, expr: []const u8, monitor: *const Monitor) eblk: {
@@ -20,11 +20,14 @@ pub fn add(self: *Self, expr: []const u8, monitor: *const Monitor) eblk: {
 }!void {
     var e = Expression.init(self.allocator);
     try e.parse(expr);
-    try self.points.append(.{
-        .enabled = true,
-        .expr = e,
-        .last_value = try e.calculate(monitor),
-    });
+    try self.points.append(
+        self.allocator,
+        .{
+            .enabled = true,
+            .expr = e,
+            .last_value = try e.calculate(monitor),
+        },
+    );
 }
 
 pub fn del(self: *Self, index: usize) Error!void {
@@ -34,20 +37,6 @@ pub fn del(self: *Self, index: usize) Error!void {
     var removed = self.points.orderedRemove(index);
     removed.expr.deinit();
 }
-
-// pub fn format(self: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: Writer) !void {
-//     _ = fmt;
-//     _ = options;
-//     try writer.print("WatchPoint: {}\n", .{self.points.items.len});
-//     for (self.points.items, 0..) |p, i| {
-//         const en: u8 = if (p.enabled) '*' else ' ';
-//         try writer.print("[{c}] #{d:<3}\t{s}\n", .{
-//             en,
-//             i,
-//             p.expr.origin_str.?,
-//         });
-//     }
-// }
 
 pub fn print(self: Self) void {
     p("WatchPoint: {}\n", .{self.points.items.len});

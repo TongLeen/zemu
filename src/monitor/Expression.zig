@@ -296,9 +296,7 @@ const ExprItem = union(enum) {
 
     /// ExprItem fmt interface.
     /// Args 'fmt' and 'options' were ignored
-    pub fn format(self: @This(), comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: Writer) !void {
-        _ = fmt;
-        _ = options;
+    pub fn format(self: @This(), writer: *Writer) !void {
         switch (self) {
             .num => {
                 try writer.print("{}", .{self.num});
@@ -316,8 +314,8 @@ const ExprItem = union(enum) {
 /// covert string to tokens (ExprItem)
 fn split(self: *const Self, s: []const u8) (SplitError || Allocator.Error)![]ExprItem {
     const ExprItemList = List(ExprItem);
-    var list = ExprItemList.init(self.allocator);
-    defer list.deinit();
+    var list = try ExprItemList.initCapacity(self.allocator, 0);
+    defer list.deinit(self.allocator);
 
     var i: usize = 0;
 
@@ -331,7 +329,7 @@ fn split(self: *const Self, s: []const u8) (SplitError || Allocator.Error)![]Exp
         // assume that operator contains only 1 character
         // '*' and '-' at head or behind operator(except ')') are considered as unary operator
         if (isOp(s[i])) {
-            try list.append(.{ .op = switch (s[i]) {
+            try list.append(self.allocator, .{ .op = switch (s[i]) {
                 '=' => .eq,
                 '+' => .add,
                 '-' => blk: {
@@ -371,7 +369,7 @@ fn split(self: *const Self, s: []const u8) (SplitError || Allocator.Error)![]Exp
                 break :loop s.len;
             };
             const reg_name = s[i + 1 .. end];
-            try list.append(.{
+            try list.append(self.allocator, .{
                 .reg = blk: {
                     if (isStrEqu(reg_name, "x0")) break :blk 0;
                     if (isStrEqu(reg_name, "x1")) break :blk 1;
@@ -454,7 +452,7 @@ fn split(self: *const Self, s: []const u8) (SplitError || Allocator.Error)![]Exp
             } else {
                 break :loop s.len;
             };
-            try list.append(.{ .num = parseInt(u32, s[i..end], 0) catch {
+            try list.append(self.allocator, .{ .num = parseInt(u32, s[i..end], 0) catch {
                 return SplitError.InvalidNumber;
             } });
             i = end;

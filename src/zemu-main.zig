@@ -12,7 +12,7 @@ pub fn zemu_main(allocator: Allocator, img: []const u8) !void {
     try cpu.addMemoryBlock(try ram.toMemoryBlock(0x8000_0000));
 
     // UART
-    var uart = try Uart.init(allocator, 256);
+    var uart = Uart.init();
     defer uart.deinit();
     try cpu.addMemoryBlock(try uart.toMemoryBlock(0x9000_0000));
 

@@ -59,7 +59,7 @@ pub fn tick(self: *Self, show_inst: bool) Error!void {
     };
 
     if (show_inst) {
-        std.debug.print(color.info(.{"{x:0>8}:\t{}\n"}), .{ self.pc, operation });
+        std.debug.print(color.info(.{"{x:0>8}:\t{f}\n"}), .{ self.pc, operation });
     }
 
     return @errorCast(Executor.exec(self, operation, inst == .cinst));

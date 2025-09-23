@@ -1,18 +1,9 @@
-rx_buffer: *RingBuffer,
-allocator: Allocator,
-
-pub fn init(allocator: Allocator, buffer_size: usize) Allocator.Error!Self {
-    const p = try allocator.create(RingBuffer);
-    p.* = try RingBuffer.init(allocator, buffer_size);
-    return .{
-        .rx_buffer = p,
-        .allocator = allocator,
-    };
+pub fn init() Self {
+    return .{};
 }
 
 pub fn deinit(self: *Self) void {
-    self.rx_buffer.deinit(self.allocator);
-    self.allocator.destroy(self.rx_buffer);
+    _ = self;
 }
 
 pub fn read(self: *const Self, byte_mask: u4) u32 {
@@ -20,9 +11,12 @@ pub fn read(self: *const Self, byte_mask: u4) u32 {
     if (byte_mask & 1 == 0) {
         return 0;
     }
-    return std.io.getStdIn().reader().readByte() catch {
+    var rbuf: [1]u8 = undefined;
+    const rsize = std.fs.File.stdin().read(&rbuf) catch { // TODO: update
         @panic("Stdin read error.\n");
     };
+    std.debug.assert(rsize == 1);
+    return rbuf[0];
 }
 
 pub fn write(self: *const Self, value: u32, byte_mask: u4) void {
@@ -52,19 +46,18 @@ pub const Error = error{
 
 fn typeErasedRead(context: *const anyopaque, addr: u30, byte_mask: u4) anyerror!u32 {
     _ = addr;
-    const ptr: *const Self = @alignCast(@ptrCast(context));
+    const ptr: *const Self = @ptrCast(@alignCast(context));
     return read(ptr, byte_mask);
 }
 
 fn typeErasedWrite(context: *const anyopaque, addr: u30, value: u32, byte_mask: u4) anyerror!void {
     _ = addr;
-    const ptr: *const Self = @alignCast(@ptrCast(context));
+    const ptr: *const Self = @ptrCast(@alignCast(context));
     return write(ptr, @truncate(value), byte_mask);
 }
 
 const Self = @This();
 const std = @import("std");
-const RingBuffer = std.RingBuffer;
 const Allocator = std.mem.Allocator;
 
 const core = @import("core");

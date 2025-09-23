@@ -1,13 +1,15 @@
 memory_block_list: MemoryBlockList,
+allocator: Allocator,
 
 pub fn init(allocator: Allocator) Allocator.Error!Self {
     return .{
-        .memory_block_list = MemoryBlockList.init(allocator),
+        .memory_block_list = try MemoryBlockList.initCapacity(allocator, 4),
+        .allocator = allocator,
     };
 }
 
 pub fn deinit(self: *Self) void {
-    self.memory_block_list.deinit();
+    self.memory_block_list.deinit(self.allocator);
 }
 
 pub fn addMemoryBlock(self: *Self, block: MemoryBlock) (MemoryBlockError || Allocator.Error)!void {
@@ -15,7 +17,7 @@ pub fn addMemoryBlock(self: *Self, block: MemoryBlock) (MemoryBlockError || Allo
     if (!ok) {
         return MemoryBlockError.AddrRangeOverlapped;
     }
-    try self.memory_block_list.append(block);
+    try self.memory_block_list.append(self.allocator, block);
 
     std.debug.print(
         color.info(.{"Memory Block added: 0x{x:0>8}-0x{x:0>8} {s}\n"}),

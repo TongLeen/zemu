@@ -655,13 +655,8 @@ pub const Operation = union(enum) {
     },
     pub fn format(
         self: *const @This(),
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: Writer,
+        writer: *Writer,
     ) !void {
-        _ = fmt;
-        _ = options;
-
         switch (self.*) {
             .al_R => |op| {
                 try writer.print("{s}\tx{d},\tx{d},\tx{d}", .{ @tagName(op.op), op.rd, op.rs1, op.rs2 });
@@ -703,7 +698,7 @@ pub const Operation = union(enum) {
 pub const Error = error{CodeIncorrect};
 
 const std = @import("std");
-const Writer = std.io.AnyWriter;
+const Writer = std.Io.Writer;
 
 const core = @import("../root.zig");
 const Csr = core.Csr;
