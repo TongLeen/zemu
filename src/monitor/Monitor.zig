@@ -294,7 +294,6 @@ const std = @import("std");
 const p = std.debug.print;
 const panic = std.debug.panic;
 const Allocator = std.mem.Allocator;
-const ArrayList = std.ArrayList;
 
 const core = @import("core");
 const Cpu = core.Cpu;
