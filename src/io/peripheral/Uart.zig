@@ -27,9 +27,9 @@ pub fn write(self: *const Self, value: u32, byte_mask: u4) void {
     std.debug.print("{c}", .{@as(u8, @truncate(value))});
 }
 
-pub fn toMemoryBlock(self: *const Self, start_addr: u32) Error!MemoryBlock {
+pub fn toMemoryBlock(self: *const Self, start_addr: u32) MemoryBlock {
     if ((start_addr & 0b11) != 0) {
-        return Error.AddrNotAligned;
+        @panic("Address of 'start' not aligned 4.");
     }
     return .{
         .context = @ptrCast(self),

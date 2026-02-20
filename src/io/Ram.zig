@@ -33,9 +33,9 @@ pub fn write(self: *const Self, addr: u30, value: u32, byte_mask: u4) RamError!v
     }
 }
 
-pub fn toMemoryBlock(self: *const Self, start_addr: u32) RamError!MemoryBlock {
+pub fn toMemoryBlock(self: *const Self, start_addr: u32) MemoryBlock {
     if ((start_addr & 0b11) != 0) {
-        return RamError.AddrNotAligned;
+        @panic("Address of 'start' not aligned 4.");
     }
     return .{
         .context = @ptrCast(self),
@@ -48,12 +48,12 @@ pub fn toMemoryBlock(self: *const Self, start_addr: u32) RamError!MemoryBlock {
 
 fn typeErasedRead(context: *const anyopaque, addr: u30, byte_mask: u4) anyerror!u32 {
     _ = byte_mask;
-    const ptr: *const Self = @alignCast(@ptrCast(context));
+    const ptr: *const Self = @ptrCast(@alignCast(context));
     return read(ptr, addr);
 }
 
 fn typeErasedWrite(context: *const anyopaque, addr: u30, value: u32, byte_mask: u4) anyerror!void {
-    const ptr: *const Self = @alignCast(@ptrCast(context));
+    const ptr: *const Self = @ptrCast(@alignCast(context));
     return write(ptr, addr, value, byte_mask);
 }
 

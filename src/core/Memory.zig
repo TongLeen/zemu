@@ -1,32 +1,18 @@
-memory_block_list: MemoryBlockList,
-allocator: Allocator,
+memory_block_list: []MemoryBlock,
 
-pub fn init(allocator: Allocator) Allocator.Error!Self {
-    return .{
-        .memory_block_list = try MemoryBlockList.initCapacity(allocator, 4),
-        .allocator = allocator,
-    };
-}
-
-pub fn deinit(self: *Self) void {
-    self.memory_block_list.deinit(self.allocator);
-}
-
-pub fn addMemoryBlock(self: *Self, block: MemoryBlock) (MemoryBlockError || Allocator.Error)!void {
-    const ok = self.ensureNotOverlapping(block);
-    if (!ok) {
-        return MemoryBlockError.AddrRangeOverlapped;
+pub fn init(memory_blocks: []MemoryBlock) Self {
+    for (memory_blocks, 0..) |*this_block, i| {
+        const bstart = this_block.start_addr & 0x3fff_fffc;
+        const bend = (this_block.start_addr + this_block.len + 3) & 0x3fff_fffc;
+        for (memory_blocks[i + 1 ..]) |another_block| {
+            if (another_block.contains(bstart) or another_block.contains(bend)) {
+                @panic("Ragion of MemoryBlock overlapped.");
+            }
+        }
     }
-    try self.memory_block_list.append(self.allocator, block);
-
-    std.debug.print(
-        color.info(.{"Memory Block added: 0x{x:0>8}-0x{x:0>8} {s}\n"}),
-        .{
-            @as(u32, block.start_addr) << 2,
-            @as(u32, (block.start_addr + block.len)) << 2,
-            if (block.write_handle == null) "ReadOnly" else "ReadWrite",
-        },
-    );
+    return .{
+        .memory_block_list = memory_blocks,
+    };
 }
 
 pub const MemoryBlock = struct {
@@ -80,7 +66,7 @@ pub fn readWord(self: *const Self, addr: u32) AccessError!u32 {
 }
 
 fn readAligned(self: *const Self, addr_aligned: u30, byte_mask: u4) AccessError!u32 {
-    const block = loop: for (self.memory_block_list.items) |v| {
+    const block = loop: for (self.memory_block_list) |*v| {
         if (v.contains(addr_aligned)) {
             break :loop v;
         }
@@ -118,7 +104,7 @@ pub fn writeWord(self: *Self, addr: u32, value: u32) AccessError!void {
 }
 
 fn writeAligned(self: *const Self, addr_aligned: u30, value: u32, byte_mask: u4) AccessError!void {
-    const block = loop: for (self.memory_block_list.items) |v| {
+    const block = loop: for (self.memory_block_list) |*v| {
         if (v.contains(addr_aligned)) {
             break :loop v;
         }
@@ -129,20 +115,6 @@ fn writeAligned(self: *const Self, addr_aligned: u30, value: u32, byte_mask: u4)
         return AccessError.NoWritePermission;
     }
     return @errorCast(block.writeAligned(addr_aligned - block.start_addr, value, byte_mask));
-}
-
-fn ensureNotOverlapping(self: *const Self, block: MemoryBlock) bool {
-    const bstart = block.start_addr & 0x3fff_fffc;
-    const bend = (block.start_addr + block.len + 3) & 0x3fff_fffc;
-    return loop: for (self.memory_block_list.items) |v| {
-        const astart = v.start_addr & 0x3fff_fffc;
-        const aend = (v.start_addr + v.len + 3) & 0x3fff_fffc;
-        if (bstart >= aend or bend <= astart) {
-            continue;
-        } else {
-            break :loop false;
-        }
-    } else true;
 }
 
 pub const AccessError = error{

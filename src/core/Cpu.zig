@@ -1,5 +1,3 @@
-const entry = 0x8000_0000;
-
 regs: Reg,
 pc: u32,
 mem: Memory,
@@ -7,19 +5,22 @@ csr: Csr,
 mode: Mode,
 fetcher: Fetcher,
 
-pub fn init(allocator: Allocator) Allocator.Error!Self {
+entry_point: u32,
+
+pub fn init(memorys: []Memory.MemoryBlock, entry_address: u32) Self {
     return .{
         .regs = undefined,
         .pc = undefined,
-        .mem = try Memory.init(allocator),
+        .mem = .init(memorys),
         .csr = undefined,
         .mode = undefined,
-        .fetcher = .{ .c_inst_buffer = 0, .c_inst_addr_buffer = null, .this_inst = .{ .inst = 0 } },
+        .fetcher = .{
+            .c_inst_buffer = 0,
+            .c_inst_addr_buffer = null,
+            .this_inst = .{ .inst = 0 },
+        },
+        .entry_point = entry_address,
     };
-}
-
-pub fn deinit(self: *Self) void {
-    self.mem.deinit();
 }
 
 pub fn start(self: *Self) Error!void {
@@ -30,7 +31,7 @@ pub fn start(self: *Self) Error!void {
 }
 
 pub fn restart(self: *Self) void {
-    self.pc = entry;
+    self.pc = self.entry_point;
     self.regs.write(0, 0);
     self.mode = .M;
 }
@@ -65,12 +66,12 @@ pub fn tick(self: *Self, show_inst: bool) Error!void {
     return @errorCast(Executor.exec(self, operation, inst == .cinst));
 }
 
-pub inline fn addMemoryBlock(
-    self: *Self,
-    memory_block: Memory.MemoryBlock,
-) !void {
-    return self.mem.addMemoryBlock(memory_block);
-}
+// pub inline fn addMemoryBlock(
+//     self: *Self,
+//     memory_block: Memory.MemoryBlock,
+// ) !void {
+//     return self.mem.addMemoryBlock(memory_block);
+// }
 
 pub const Error = error{Ebreak};
 
