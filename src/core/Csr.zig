@@ -152,53 +152,34 @@ pub const Csr = enum(u12) {
     // tdata1 = 0x7a1,
 };
 
-const Mstatus = struct {
-    sd: u1,
-    wpri0: u2,
-    vm: u5,
-    wpri1: u4,
-    mxr: u1,
-    pum: u1,
-    mprv: u1,
-    xs: u2,
-    fs: u2,
-    mpp: u2,
-    hpp: u2,
-    spp: u1,
-    mpie: u1,
-    hpie: u1,
-    spie: u1,
-    upie: u1,
-    mie: u1,
-    hie: u1,
-    sie: u1,
+const Mstatus = packed struct {
     uie: u1,
+    sie: u1,
+    hie: u1,
+    mie: u1,
+    upie: u1,
+    spie: u1,
+    hpie: u1,
+    mpie: u1,
+    spp: u1,
+    hpp: u2,
+    mpp: u2,
+    fs: u2,
+    xs: u2,
+    mprv: u1,
+    pum: u1,
+    mxr: u1,
+    wpri1: u4,
+    vm: u5,
+    wpri0: u2,
+    sd: u1,
 
     pub fn get(self: *const @This()) u32 {
-        return ((@as(u32, self.sd) << 31) | (@as(u32, self.wpri0) << 29) | (@as(u32, self.vm) << 24) | (@as(u32, self.wpri1) << 20) | (@as(u32, self.mxr) << 19) | (@as(u32, self.pum) << 18) | (@as(u32, self.mprv) << 17) | (@as(u32, self.xs) << 15) | (@as(u32, self.fs) << 13) | (@as(u32, self.mpp) << 11) | (@as(u32, self.hpp) << 9) | (@as(u32, self.spp) << 8) | (@as(u32, self.mpie) << 7) | (@as(u32, self.hpie) << 6) | (@as(u32, self.spie) << 5) | (@as(u32, self.upie) << 4) | (@as(u32, self.mie) << 3) | (@as(u32, self.mie) << 2) | (@as(u32, self.mie) << 1) | (@as(u32, self.mie) << 0));
+        return @bitCast(self.*);
     }
 
     pub fn set(self: *@This(), value: u32) void {
-        self.sd = @truncate(value >> 31);
-        self.wpri0 = @truncate(value >> 29);
-        self.vm = @truncate(value >> 24);
-        self.wpri1 = @truncate(value >> 20);
-        self.mxr = @truncate(value >> 19);
-        self.pum = @truncate(value >> 18);
-        self.mprv = @truncate(value >> 17);
-        self.xs = @truncate(value >> 15);
-        self.fs = @truncate(value >> 13);
-        self.mpp = @truncate(value >> 11);
-        self.hpp = @truncate(value >> 9);
-        self.spp = @truncate(value >> 8);
-        self.mpie = @truncate(value >> 7);
-        self.hpie = @truncate(value >> 6);
-        self.spie = @truncate(value >> 5);
-        self.upie = @truncate(value >> 4);
-        self.mie = @truncate(value >> 3);
-        self.hie = @truncate(value >> 2);
-        self.sie = @truncate(value >> 1);
-        self.uie = @truncate(value >> 0);
+        self.* = @bitCast(value);
     }
 };
 
