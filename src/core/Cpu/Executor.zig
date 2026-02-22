@@ -208,12 +208,10 @@ pub fn exec(cpu: *Cpu, operation: Operation, is_c_inst: bool) Error!void {
         },
         .jp_I => |op| {
             assert(op.op == .JALR);
-            cpu.writeReg(op.rd, cpu.pc + @as(u32, if (is_c_inst) 2 else 4));
-
             const rs1v = cpu.readReg(op.rs1);
             const imm_extended: i32 = @as(i12, @bitCast(op.imm));
-            const bias_by_byte: i32 = imm_extended << 1;
-            cpu.pc = (rs1v +% @as(u32, @bitCast(bias_by_byte))) & 0xffff_fffe;
+            cpu.writeReg(op.rd, cpu.pc + @as(u32, if (is_c_inst) 2 else 4));
+            cpu.pc = (rs1v +% @as(u32, @bitCast(imm_extended))) & 0xffff_fffe;
             return;
         },
         .lu_U => |op| {

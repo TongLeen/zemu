@@ -368,7 +368,7 @@ pub fn decodeCompressed(cinst: u16) Error!Operation {
                 },
             } },
             // c.lui c.addi16sp
-            0b011 => if (bits.extract(.{ 6, 2 }, cinst) == 2) .{ .al_I = .{
+            0b011 => if (bits.extract(.{ 11, 7 }, cinst) == 2) .{ .al_I = .{
                 .op = .ADDI,
                 .rd = 2,
                 .rs1 = 2,
