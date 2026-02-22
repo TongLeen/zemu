@@ -1,20 +1,25 @@
 pub fn zemu_main(allocator: Allocator, img: []const u8) !void {
+    // ROM 16MiB
+    var rom = try Ram.init(allocator, 0x100_0000);
+    defer rom.deinit();
+    const img_dst: []u8 = @as([*]u8, @ptrCast(rom.raw.ptr))[0..img.len];
+    std.mem.copyForwards(u8, img_dst, img);
+
     // RAM 16MiB
     var ram = try Ram.init(allocator, 0x100_0000);
     defer ram.deinit();
-    const img_dst: []u8 = @as([*]u8, @ptrCast(ram.raw.ptr))[0..img.len];
-    std.mem.copyForwards(u8, img_dst, img);
 
     // UART
     var uart = Uart.init();
     defer uart.deinit();
 
     var memorys = [_]MemoryBlock{
-        ram.toMemoryBlock(0x2000_0000),
+        rom.toMemoryBlock(0x0800_0000, .ReadOnly),
+        ram.toMemoryBlock(0x2000_0000, .ReadWrite),
         uart.toMemoryBlock(0x9000_0000),
     };
 
-    var cpu = Cpu.init(memorys[0..], 0x2000_0000);
+    var cpu = Cpu.init(memorys[0..], 0x0800_0000);
 
     var m = Monitor.init(&cpu, allocator);
     defer m.deinit();
@@ -31,6 +36,7 @@ const Cpu = core.Cpu;
 const MemoryBlock = core.Memory.MemoryBlock;
 
 const io = @import("io");
+const Rom = io.Rom;
 const Ram = io.Ram;
 const Uart = io.Uart;
 
