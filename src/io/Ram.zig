@@ -33,14 +33,21 @@ pub fn write(self: *const Self, addr: u30, value: u32, byte_mask: u4) RamError!v
     }
 }
 
-pub fn toMemoryBlock(self: *const Self, start_addr: u32) MemoryBlock {
+pub fn toMemoryBlock(
+    self: *const Self,
+    start_addr: u32,
+    mode: Mode,
+) MemoryBlock {
     if ((start_addr & 0b11) != 0) {
         @panic("Address of 'start' not aligned 4.");
     }
     return .{
         .context = @ptrCast(self),
         .read_handle = typeErasedRead,
-        .write_handle = typeErasedWrite,
+        .write_handle = switch (mode) {
+            .ReadWrite => typeErasedWrite,
+            .ReadOnly => null,
+        },
         .start_addr = @truncate(start_addr >> 2),
         .len = @truncate(self.raw.len),
     };
@@ -61,6 +68,11 @@ pub const RamError = error{
     AddrNotAligned,
     AddrOutOfRange,
 } || Allocator.Error;
+
+pub const Mode = enum {
+    ReadOnly,
+    ReadWrite,
+};
 
 const Self = @This();
 const std = @import("std");
