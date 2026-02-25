@@ -2,7 +2,13 @@ this_inst: Inst,
 c_inst_buffer: u16,
 c_inst_addr_buffer: ?u32 = null,
 
-pub fn fetch(self: *Self, cpu: *const Cpu) Memory.AccessError!Inst {
+pub fn fetch(self: *Self, cpu: anytype) Memory.AccessError!Inst {
+    const i = try self._fetch(cpu);
+    self.this_inst = i;
+    return i;
+}
+
+fn _fetch(self: *Self, cpu: anytype) Memory.AccessError!Inst {
     const this_inst_addr = cpu.pc;
     if (this_inst_addr & 0b1 == 1) {
         unreachable;
@@ -49,6 +55,8 @@ pub const Inst = union(enum) {
 
 const Self = @This();
 
-const core = @import("../root.zig");
-const Cpu = core.Cpu;
+const core = @import("core");
+
 const Memory = core.Memory;
+
+// const Cpu = @import("../riscv32.zig").Riscv32(.{}, 0);

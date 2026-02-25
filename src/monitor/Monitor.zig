@@ -26,23 +26,23 @@ pub fn startLoop(self: *Self) void {
     while (true) {
         // try to run 1 step
         // check watchpoints
-        const step_result = switch (self.status) {
-            .running => self.step(false),
+        const step_result: ?Status = switch (self.status) {
+            .running => self.step(),
             .stepping => blk: {
                 if (step_cnt == 0) {
                     self.status = .paused;
-                    break :blk StepResult{};
+                    break :blk null;
                 } else {
                     step_cnt -= 1;
-                    break :blk self.step(true);
+                    break :blk self.step();
                 }
             },
-            .stopped, .paused => StepResult{},
+            .stopped, .paused => null,
         };
 
         // update status
-        if (step_result.is_no_empty) {
-            self.status = step_result.new_status orelse self.status;
+        if (step_result) |v| {
+            self.status = v;
         }
 
         if (!(self.status == .paused or self.status == .stopped)) {
@@ -84,7 +84,7 @@ pub fn startLoop(self: *Self) void {
             },
             .r => {
                 self.status = .paused;
-                self.cpu.restart();
+                self.cpu.reset();
             },
 
             .c => {
@@ -159,11 +159,11 @@ pub fn startLoop(self: *Self) void {
 
 pub fn readReg(self: *const Self, reg_num: u6) u32 {
     if (reg_num < 32) {
-        return self.cpu.regs.read(@truncate(reg_num));
+        return self.cpu.readReg(@truncate(reg_num));
     } else {
         switch (reg_num) {
             32 => {
-                return self.cpu.pc;
+                return self.cpu.readPc();
             },
             else => unreachable,
         }
@@ -177,29 +177,23 @@ pub fn readMemWord(self: *const Self, addr: u32) core.Memory.AccessError!u32 {
     return self.cpu.mem.readWord(addr);
 }
 
-fn step(self: *Self, show_inst: bool) StepResult {
-    var result = StepResult{};
-    self.cpu.tick(show_inst) catch |e| switch (e) {
-        Cpu.Error.Ebreak => {
-            // caution!
-            // this is not what real machine do
-            result.is_no_empty = true;
-            result.new_status = if (self.cpu.readReg(17) == 255) .stopped else .paused;
-            if (result.new_status == .stopped) {
-                p(color.info(.{"Program reach end.\n"}), .{});
-            }
+fn step(self: *Self) ?Status {
+    self.cpu.tick() catch |e| switch (e) {
+        error.Ebreak => {
+            p(color.info(.{"Program reach end.\n"}), .{});
+            return .stopped;
         },
+        else => unreachable,
     };
 
     if (self.checkWatchPoints()) |v| {
         if (v) {
-            result.is_no_empty = true;
-            result.new_status = .paused;
+            return .paused;
         }
     } else |e| {
         p(color.err(.{"CheckWatchPoint: MemoryAccessError: {s}\n"}), .{@errorName(e)});
     }
-    return result;
+    return null;
 }
 
 fn info(self: *const Self, subcmd: Cli.CmdInfoSubcmd) void {
@@ -216,7 +210,7 @@ fn info(self: *const Self, subcmd: Cli.CmdInfoSubcmd) void {
             p("{s}\n", .{@tagName(self.status)});
         },
         .mode => {
-            p("{s}\n", .{@tagName(self.cpu.mode)});
+            p("{c}\n", .{([4]u8{ 'U', 'S', 'H', 'M' })[(self.cpu.readMode())]});
         },
     }
 }
@@ -229,7 +223,7 @@ fn checkWatchPoints(self: *const Self) core.Memory.AccessError!bool {
             if (new_v != point.last_value) {
                 p(
                     color.info(.{"{x:0>8}\tWP #{d} ('{s}'):\t0x{x:0>8}({d}) -> 0x{x:0>8}({d})\n"}),
-                    .{ self.cpu.pc, i, point.expr.origin_str.?, point.last_value, point.last_value, new_v, new_v },
+                    .{ self.cpu.readPc(), i, point.expr.origin_str.?, point.last_value, point.last_value, new_v, new_v },
                 );
                 point.last_value = new_v;
                 reach_watchpoint = true;
@@ -240,11 +234,6 @@ fn checkWatchPoints(self: *const Self) core.Memory.AccessError!bool {
 }
 
 const Status = enum { running, stepping, stopped, paused };
-
-const StepResult = struct {
-    is_no_empty: bool = false,
-    new_status: ?Status = null,
-};
 
 const help_doc =
     \\

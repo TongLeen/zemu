@@ -19,12 +19,18 @@ pub fn zemu_main(allocator: Allocator, img: []const u8) !void {
         uart.toMemoryBlock(0x9000_0000),
     };
 
-    var cpu = Cpu.init(memorys[0..], 0x0800_0000);
+    const RV32Spec = RV32(
+        .{ .C = true },
+        0x0800_0000,
+    );
+
+    var RV32_CPU = RV32Spec.init(memorys[0..]);
+    var cpu = RV32_CPU.cpu();
 
     var m = Monitor.init(&cpu, allocator);
     defer m.deinit();
 
-    cpu.restart();
+    cpu.reset();
     m.startLoop();
 }
 
@@ -32,7 +38,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const core = @import("core");
-const Cpu = core.Cpu;
+const RV32 = core.isa.Riscv32;
 const MemoryBlock = core.Memory.MemoryBlock;
 
 const io = @import("io");
