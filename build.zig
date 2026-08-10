@@ -21,6 +21,14 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/misc/root.zig"),
     });
 
+    const readline_trans = b.addTranslateC(.{
+        .root_source_file = b.path("headers/readline.h"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    const readline_mod = readline_trans.createModule();
+
     const exe_mod = b.addModule(
         "zemu",
         .{
@@ -32,6 +40,7 @@ pub fn build(b: *std.Build) void {
     io_mod.addImport("core", core_mod);
     monitor_mod.addImport("core", core_mod);
     monitor_mod.addImport("misc", misc_mod);
+    monitor_mod.addImport("readline", readline_mod);
     monitor_mod.linkSystemLibrary("readline", .{});
     core_mod.addImport("core", core_mod);
     core_mod.addImport("misc", misc_mod);

@@ -2,20 +2,21 @@ history_path: [*c]u8,
 allocator: Allocator,
 
 pub fn init(allocator: Allocator) Self {
-    _ = clib.rl_bind_key('\t', clib.rl_insert);
-    clib.stifle_history(500);
-    const home_path = clib.getenv("HOME");
+    _ = readline.rl_bind_key('\t', readline.rl_insert);
+    readline.stifle_history(500);
+
+    const home_path = readline.getenv("HOME");
     const sub_path = "/.zemu_monitor_history";
-    const total_len = clib.strlen(home_path) + sub_path.len + 1;
-    const history_path: [*c]u8 = @ptrCast(clib.malloc(total_len) orelse {
+    const total_len = readline.strlen(home_path) + sub_path.len + 1;
+    const history_path: [*c]u8 = @ptrCast(readline.malloc(total_len) orelse {
         return .{
             .history_path = 0,
             .allocator = allocator,
         };
     });
-    _ = clib.strcpy(history_path, home_path);
-    _ = clib.strcat(history_path, sub_path);
-    _ = clib.read_history(history_path);
+    _ = readline.strcpy(history_path, home_path);
+    _ = readline.strcat(history_path, sub_path);
+    _ = readline.read_history(history_path);
     return .{
         .history_path = history_path,
         .allocator = allocator,
@@ -24,22 +25,22 @@ pub fn init(allocator: Allocator) Self {
 
 pub fn deinit(self: *Self) void {
     if (self.history_path != 0) {
-        _ = clib.write_history(self.history_path);
+        _ = readline.write_history(self.history_path);
     }
-    clib.free(self.history_path);
+    readline.free(self.history_path);
 }
 
 pub fn get(self: *const Self, prompt: [:0]const u8) (Allocator.Error || Error)!CliCmd {
-    const line_raw = clib.readline(@ptrCast(prompt.ptr));
+    const line_raw = readline.readline(@ptrCast(prompt.ptr));
     if (line_raw == 0) {
         panic(color.err(.{"Lib 'readline' get input failed.\n"}), .{});
     }
-    defer clib.free(line_raw);
+    defer readline.free(line_raw);
     if (line_raw[0] != 0) {
-        clib.add_history(line_raw);
+        readline.add_history(line_raw);
     }
 
-    const line_len: usize = clib.strlen(line_raw);
+    const line_len: usize = readline.strlen(line_raw);
     const line = try self.allocator.alloc(u8, line_len);
     errdefer {
         self.allocator.free(line);
@@ -153,13 +154,7 @@ pub const Cmd = union(enum) {
 
 pub const CmdInfoSubcmd = enum { r, csr, w, status, mode };
 
-const clib = @cImport({
-    @cInclude("readline/readline.h");
-    @cInclude("readline/history.h");
-    @cInclude("readline/rlconf.h");
-    @cInclude("stdlib.h");
-    @cInclude("string.h");
-});
+const readline = @import("readline");
 
 const Self = @This();
 const std = @import("std");

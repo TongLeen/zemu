@@ -2,6 +2,8 @@
 
 !/src
 !/src/**
+!/headers
+!/headers/**
 
 !/build.zig
 
