@@ -1,11 +1,8 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    buildExe(b);
     // test_mod_monitor(b);
-}
 
-fn buildExe(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -17,6 +14,8 @@ fn buildExe(b: *std.Build) void {
     });
     const monitor_mod = b.addModule("monitor", .{
         .root_source_file = b.path("src/monitor/root.zig"),
+        .link_libc = true,
+        .target = target,
     });
     const misc_mod = b.addModule("misc", .{
         .root_source_file = b.path("src/misc/root.zig"),
@@ -33,6 +32,7 @@ fn buildExe(b: *std.Build) void {
     io_mod.addImport("core", core_mod);
     monitor_mod.addImport("core", core_mod);
     monitor_mod.addImport("misc", misc_mod);
+    monitor_mod.linkSystemLibrary("readline", .{});
     core_mod.addImport("core", core_mod);
     core_mod.addImport("misc", misc_mod);
 
@@ -44,9 +44,6 @@ fn buildExe(b: *std.Build) void {
         .name = "zemu",
         .root_module = exe_mod,
     });
-
-    exe.linkLibC();
-    exe.linkSystemLibrary("readline");
 
     b.installArtifact(exe);
 

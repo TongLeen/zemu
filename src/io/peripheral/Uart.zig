@@ -8,15 +8,17 @@ pub fn deinit(self: *Self) void {
 
 pub fn read(self: *const Self, byte_mask: u4) u32 {
     _ = self;
-    if (byte_mask & 1 == 0) {
-        return 0;
-    }
-    var rbuf: [1]u8 = undefined;
-    const rsize = std.fs.File.stdin().read(&rbuf) catch { // TODO: update
-        @panic("Stdin read error.\n");
-    };
-    std.debug.assert(rsize == 1);
-    return rbuf[0];
+    _ = byte_mask;
+    // if (byte_mask & 1 == 0) {
+    //     return 0;
+    // }
+    // var rbuf: [1]u8 = undefined;
+    // const rsize = std.fs.File.stdin().read(&rbuf) catch { // TODO: update
+    //     @panic("Stdin read error.\n");
+    // };
+    // std.debug.assert(rsize == 1);
+    // return rbuf[0];
+    return 0;
 }
 
 pub fn write(self: *const Self, value: u32, byte_mask: u4) void {
